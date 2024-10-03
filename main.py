@@ -1,13 +1,54 @@
 from fastapi import FastAPI, BackgroundTasks
-import pyautogui
+import pyautogui    
 import time
 import random
+import numpy as np
 from threading import Event
 
 app = FastAPI()
 
 # Flag to control the mouse juggling loop
 stop_event = Event()
+
+def move_mouse_exponential_to_random(duration=1.0, steps=10):
+    
+    # Get current mouse position
+    start_x, start_y = pyautogui.position()
+    
+    # Get screen size to limit random movement within the screen bounds
+    screen_width, screen_height = pyautogui.size()
+    
+    # Generate random target position
+    end_x = random.randint(0, screen_width)
+    end_y = random.randint(0, screen_height)
+    
+    # Generate random exponential curve modifiers
+    exp_factor = random.uniform(0.5, 2.0)  # Random curve steepness factor
+    invert_curve = random.choice([True, False])  # Randomly decide to invert the curve
+    
+    # Generate time points for the curve, distributed exponentially
+    time_points = np.linspace(0, 1, steps)
+    if invert_curve:
+        curve_points = np.exp(exp_factor * time_points) - 1
+    else:
+        curve_points = 1 - np.exp(-exp_factor * time_points)
+    
+    # Normalize the curve points between 0 and 1
+    curve_points = (curve_points - curve_points.min()) / (curve_points.max() - curve_points.min())
+    
+    # Calculate the x and y positions along the curve
+    x_positions = start_x + (end_x - start_x) * curve_points
+    y_positions = start_y + (end_y - start_y) * curve_points
+    
+    # Move the mouse pointer along the calculated points
+    start_time = time.time()
+    for x, y in zip(x_positions, y_positions):
+        pyautogui.moveTo(x, y)
+        elapsed_time = time.time() - start_time
+        if elapsed_time < duration:
+            time.sleep(duration / steps)
+    
+    print(f"Mouse moved from ({start_x}, {start_y}) to ({end_x}, {end_y})")
 
 # Function to move mouse
 def move_mouse(n, speed):
@@ -69,7 +110,7 @@ async def start(background_tasks: BackgroundTasks):
         stop_event.clear()  # Clear the stop flag to allow restarting
 
     if not stop_event.is_set():  # Ensure it's not running
-        background_tasks.add_task(start_juggling)  # Run juggling in the background
+        background_tasks.add_task(move_mouse_exponential_to_random)  # Run juggling in the background
         return {"message": "Mouse juggling started!"}
     return {"message": "Mouse juggling is already running!"}
 
