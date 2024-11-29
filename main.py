@@ -1,4 +1,5 @@
 from fastapi import FastAPI, BackgroundTasks, Query
+from fastapi.middleware.cors import CORSMiddleware
 import pyautogui    
 import time
 import random
@@ -7,6 +8,15 @@ from threading import Event
 import math
 
 app = FastAPI()
+
+# Enable CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins. Replace with a list of URLs to restrict access
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all HTTP methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allows all headers
+)
 
 # Flag to control the mouse juggling loop
 stop_event = Event()
@@ -168,8 +178,8 @@ async def click_after_delay(
 
             # Only move the cursor to the final target position once
             final_x, final_y = path[-1]  # Get the final point of the path
-            pyautogui.moveTo(final_x, final_y, duration=random.uniform(0.2, 0.5))  # Smooth final move
-            pyautogui.click()  # Click at the target position after movement
+            # pyautogui.moveTo(final_x, final_y, duration=random.uniform(0.2, 0.5))  # Smooth final move
+            # pyautogui.click()  # Click at the target position after movement
 
             print(f"Mouse clicked at position ({final_x}, {final_y}) after parabolic movement")
         elif movement_type == "wander":
