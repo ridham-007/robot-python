@@ -1,17 +1,17 @@
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks, Query
 import pyautogui    
 import time
 import random
 import numpy as np
 from threading import Event
+import math
 
 app = FastAPI()
 
 # Flag to control the mouse juggling loop
 stop_event = Event()
 
-def move_mouse_exponential_to_random(duration=1.0, steps=10):
-    
+def move_mouse_exponential_to_random(duration=1.0, steps=100):
     # Get current mouse position
     start_x, start_y = pyautogui.position()
     
@@ -40,13 +40,24 @@ def move_mouse_exponential_to_random(duration=1.0, steps=10):
     x_positions = start_x + (end_x - start_x) * curve_points
     y_positions = start_y + (end_y - start_y) * curve_points
     
-    # Move the mouse pointer along the calculated points
+    # Add micro-random variations to simulate human imperfections in mouse movement
+    def add_micro_variation(position, intensity=2):
+        return position + random.uniform(-intensity, intensity)
+    
+    # Start the mouse movement
     start_time = time.time()
-    for x, y in zip(x_positions, y_positions):
+    for i in range(steps):
+        x = add_micro_variation(x_positions[i])
+        y = add_micro_variation(y_positions[i])
         pyautogui.moveTo(x, y)
+        
+        # Compute the time to pause between steps for smoothness
         elapsed_time = time.time() - start_time
-        if elapsed_time < duration:
-            time.sleep(duration / steps)
+        remaining_time = duration - elapsed_time
+        if remaining_time > 0:
+            time.sleep(remaining_time / (steps - i))
+        else:
+            break  # Exit if time exceeded the intended duration
     
     print(f"Mouse moved from ({start_x}, {start_y}) to ({end_x}, {end_y})")
 
@@ -118,3 +129,92 @@ async def start(background_tasks: BackgroundTasks):
 async def stop():
     stop_event.set()  # Set the stop flag to stop the loop
     return {"message": "Mouse juggling stopped!"}
+
+@app.post("/click")
+async def click_after_delay(
+    background_tasks: BackgroundTasks,
+    x: int = Query(None, description="X-coordinate of the position"),
+    y: int = Query(None, description="Y-coordinate of the position"),
+):
+    """
+    API to move the mouse to a specified position and click after a 2-second delay,
+    with human-like random movements including zigzags, curves, wandering, and corrections.
+    """
+    def delayed_click():
+        time.sleep(0.4)  # Reduced delay (was 2 seconds, now ~0.4s)
+        screen_width, screen_height = pyautogui.size()
+
+        target_x = x if x is not None else screen_width // 2 - 10
+        target_y = y if y is not None else screen_height - 200
+
+        current_x, current_y = pyautogui.position()
+        movement_type = random.choice(["parabolic", "wander", "multi_directional"])
+
+        path = []
+        if movement_type == "parabolic":
+            steps = random.randint(10, 15)  # Smooth, gradual movement
+            curve_amplitude = random.randint(100, 100)  # Adjust based on distance
+            path = []
+
+            for i in range(steps + 1):
+                t = i / steps  # Progress (0 to 1)
+                interp_x = current_x + (target_x - current_x) * t
+                interp_y = current_y + (target_y - current_y) * t
+
+                # Quadratic parabolic offset for natural curve
+                mid_x = (current_x + target_x) / 2
+                offset = curve_amplitude * (1 - 4 * ((interp_x - mid_x) / (target_x - current_x))**2)
+                path.append((interp_x, interp_y + offset))
+
+            for point in path:
+                pyautogui.moveTo(point[0], point[1], duration=random.uniform(0.004, 0.02))  # Smooth motion
+            pyautogui.click()
+            print(f"Mouse clicked at position ({target_x}, {target_y}) after parabolic movement")
+
+        elif movement_type == "wander":
+            num_points = random.randint(2, 3)  # Fewer wander points
+            wander_radius = random.randint(30, 80)
+            intermediate_points = [
+                (
+                    current_x + random.randint(-wander_radius, wander_radius),
+                    current_y + random.randint(-wander_radius, wander_radius),
+                )
+                for _ in range(num_points)
+            ]
+            intermediate_points.append((target_x, target_y))
+            for i, (next_x, next_y) in enumerate(intermediate_points):
+                steps = random.randint(5, 10)
+                for j in range(steps + 1):
+                    t = j / steps
+                    interp_x = current_x + (next_x - current_x) * t
+                    interp_y = current_y + (next_y - current_y) * t
+                    path.append((interp_x, interp_y))
+                current_x, current_y = next_x, next_y
+
+        elif movement_type == "multi_directional":
+            num_segments = random.randint(2, 3)  # Fewer random movements
+            for _ in range(num_segments):
+                random_x = current_x + random.randint(-50, 50)
+                random_y = current_y + random.randint(-50, 50)
+                steps = random.randint(5, 8)
+                for i in range(steps + 1):
+                    t = i / steps
+                    interp_x = current_x + (random_x - current_x) * t
+                    interp_y = current_y + (random_y - current_y) * t
+                    path.append((interp_x, interp_y))
+                current_x, current_y = random_x, random_y
+            steps = random.randint(10, 15)
+            for i in range(steps + 1):
+                t = i / steps
+                interp_x = current_x + (target_x - current_x) * t
+                interp_y = current_y + (target_y - current_y) * t
+                path.append((interp_x, interp_y))
+
+        for point in path:
+            pyautogui.moveTo(point[0], point[1], duration=random.uniform(0.004, 0.02))  # Increased speed
+
+        pyautogui.click()
+        print(f"Mouse clicked at position ({target_x}, {target_y}) after {movement_type} movement")
+
+    background_tasks.add_task(delayed_click)
+    return {"message": f"Mouse move (human-like) and click scheduled to happen quickly at ({x}, {y})!"}
