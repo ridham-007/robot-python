@@ -166,11 +166,12 @@ async def click_after_delay(
                 offset = curve_amplitude * (1 - 4 * ((interp_x - mid_x) / (target_x - current_x))**2)
                 path.append((interp_x, interp_y + offset))
 
-            for point in path:
-                pyautogui.moveTo(point[0], point[1], duration=random.uniform(0.004, 0.02))  # Smooth motion
-            pyautogui.click()
-            print(f"Mouse clicked at position ({target_x}, {target_y}) after parabolic movement")
+            # Only move the cursor to the final target position once
+            final_x, final_y = path[-1]  # Get the final point of the path
+            pyautogui.moveTo(final_x, final_y, duration=random.uniform(0.2, 0.5))  # Smooth final move
+            pyautogui.click()  # Click at the target position after movement
 
+            print(f"Mouse clicked at position ({final_x}, {final_y}) after parabolic movement")
         elif movement_type == "wander":
             num_points = random.randint(2, 3)  # Fewer wander points
             wander_radius = random.randint(30, 80)
