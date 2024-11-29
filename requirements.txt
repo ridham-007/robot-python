@@ -1,0 +1,4 @@
+fastapi==0.100.0
+uvicorn==0.22.0
+pyautogui==0.9.54
+numpy==1.26.0
